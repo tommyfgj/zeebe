@@ -9,6 +9,7 @@ package io.camunda.zeebe.broker.system.partitions;
 
 import io.atomix.raft.RaftRoleChangeListener;
 import io.atomix.raft.RaftServer.Role;
+import io.atomix.raft.SnapshotReplicationListener;
 import io.camunda.zeebe.broker.Loggers;
 import io.camunda.zeebe.broker.exporter.stream.ExporterDirector;
 import io.camunda.zeebe.broker.system.monitoring.DiskSpaceUsageListener;
@@ -31,7 +32,11 @@ import java.util.Optional;
 import org.slf4j.Logger;
 
 public final class ZeebePartition extends Actor
-    implements RaftRoleChangeListener, HealthMonitorable, FailureListener, DiskSpaceUsageListener {
+    implements RaftRoleChangeListener,
+        HealthMonitorable,
+        FailureListener,
+        DiskSpaceUsageListener,
+        SnapshotReplicationListener {
 
   private static final Logger LOG = Loggers.SYSTEM_LOGGER;
   private Role raftRole;
@@ -460,5 +465,15 @@ public final class ZeebePartition extends Actor
             LOG.error("Could not resume exporting", e);
           }
         });
+  }
+
+  @Override
+  public void onSnapshotReplicationStarted() {
+    actor.run(() -> transition.toInactive());
+  }
+
+  @Override
+  public void onSnapshotReplicationCompleted(final Role role, final long term) {
+    actor.run(() -> onRoleChange(role, term));
   }
 }
